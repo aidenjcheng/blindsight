@@ -1,0 +1,55 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+ModelConversion/mobileclip_blt.ts
+# Xcode — build products & caches
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.xcuserstate
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# CocoaPods (if added later)
+Pods/
+
+# Carthage (if added later)
+Carthage/Build/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Python (ModelConversion)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Tooling / local IDE
+.idea/
+*.swp
+*.swo
+
+# Claude Code — machine-local overrides
+.claude/settings.local.json
+./ModelConversion/mobileclip_blt.ts
