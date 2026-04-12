@@ -256,7 +256,7 @@ struct NavigationActiveView: View {
                         .frame(maxWidth: .infinity)
                         .aspectRatio(3.0 / 4.0, contentMode: .fit)
                         .clipped()
-                    DepthVisualizationView()
+                    DepthVisualizationView(depthMap: appState.debugDepthMap)
                         .frame(maxWidth: .infinity)
                         .aspectRatio(3.0 / 4.0, contentMode: .fit)
                         .clipped()

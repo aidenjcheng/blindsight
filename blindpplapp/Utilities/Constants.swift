@@ -87,11 +87,11 @@ enum BNConstants {
   ///
   /// AIzaSyDvGLiequiEp9mzGmvOvJOWxw7JjIBFTvw
   //  static let hardcodedGeminiAPIKey = "AIzaSyBGiJwodrYdIYcn_V9W9AsoqLPtx-ETXlk"
-  static let hardcodedGeminiAPIKey = "AIzaSyDvGLiequiEp9mzGmvOvJOWxw7JjIBFTvw"
+  static let hardcodedGeminiAPIKey = ProcessInfo.processInfo.environment["API_URL"] ?? ""
 
   // MARK: - User defaults keys
 
-  static let apiKeyUserDefaultsKey = "AIzaSyDvGLiequiEp9mzGmvOvJOWxw7JjIBFTvw"
+  static let apiKeyUserDefaultsKey = ProcessInfo.processInfo.environment["API_URL"] ?? "gemini_api_key"
   static let dangerDistanceKey = "danger_distance"
   static let warningDistanceKey = "warning_distance"
   static let voiceSpeedKey = "voice_speed"

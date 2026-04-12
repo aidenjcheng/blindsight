@@ -38,6 +38,9 @@ struct SpatialAudioTestView: View {
    VStack(spacing: BNTheme.Spacing.md) {
     SpatialAudioHeader(dismiss: dismiss)
     SpatialAudioStatusSection(testEngine: testEngine)
+    if testEngine.debugDepthMap != nil {
+     DepthVisualizationView(depthMap: testEngine.debugDepthMap)
+    }
     if testEngine.isShowingAcquireOverlay {
      SpatialAudioAcquireOverlay(testEngine: testEngine)
     }
@@ -101,6 +104,11 @@ struct ObstacleDisplayInfo: Identifiable {
 final class SpatialAudioTestEngine: NSObject, ObservableObject {
  @Published var arStatus = "Initializing"
  @Published var meshStatus = "Waiting for LiDAR..."
+ @Published var debugDepthMap:
+  (
+   depthGrid: [[Float]], gridWidth: Int, gridHeight: Int,
+   closestObstacle: (x: Int, y: Int, distance: Float)?
+  )?
  @Published var meshAnchorCount = 0
  @Published var totalVertexCount = ""
  @Published var headTrackingStatus = "Phone Orientation"
@@ -133,6 +141,8 @@ final class SpatialAudioTestEngine: NSObject, ObservableObject {
 
  private let subgoalAdvanceMaxDistanceMeters: Float = 1.7
  private let canonicalImageOrientation: CGImagePropertyOrientation = .left
+ private let depthService = DepthEstimationService()
+ private var cancellables = Set<AnyCancellable>()
 
  private enum HopState {
   case idle
@@ -542,6 +552,23 @@ final class SpatialAudioTestEngine: NSObject, ObservableObject {
   let session = ARSession()
   session.delegate = self
   self.arSession = session
+  depthService.configure(session: session)
+  depthService.obstacleMapPublisher.sink { [weak self] map in
+   guard let self = self else { return }
+   let closest = map.closestObstacleInWalkingDirection()
+   self.debugDepthMap = (
+    depthGrid: map.depthGrid,
+    gridWidth: map.gridWidth,
+    gridHeight: map.gridHeight,
+    closestObstacle: closest.map {
+     (
+      x: Int($0.normalizedX * Float(map.gridWidth)), y: Int($0.normalizedY * Float(map.gridHeight)),
+      distance: ObstacleMap.approximateDistance(
+       inverseDepth: $0.depth, scaleFactor: self.depthService.depthScaleFactor)
+     )
+    }
+   )
+  }.store(in: &cancellables)
 
   let config = ARWorldTrackingConfiguration()
   config.planeDetection = [.horizontal, .vertical]
@@ -994,6 +1021,7 @@ extension SpatialAudioTestEngine: ARSessionDelegate {
 
   DispatchQueue.main.async { [weak self] in
    guard let self = self else { return }
+   self.depthService.sessionDidUpdateFrame(frame)
 
    let now = Date()
    if self.hopState != .acquiring {

@@ -2,11 +2,11 @@ import SwiftUI
 import UIKit
 
 struct DepthVisualizationView: View {
-    @EnvironmentObject var appState: AppState
+    let depthMap: (depthGrid: [[Float]], gridWidth: Int, gridHeight: Int, closestObstacle: (x: Int, y: Int, distance: Float)?)?
 
     var body: some View {
         VStack(spacing: 0) {
-            if let depthMap = appState.debugDepthMap {
+            if let depthMap = depthMap {
                 ZStack(alignment: .bottom) {
                     DepthHeatmapView(
                         depthGrid: depthMap.depthGrid,
@@ -32,7 +32,7 @@ struct DepthVisualizationView: View {
                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
                             .foregroundColor(closest.distance < 0.8 ? BNTheme.danger : .white)
                             .contentTransition(.numericText())
-                            .animation(.default, value: closest.distance)
+                            .animation(.linear(duration: 0.2), value: closest.distance)
                         }
                     }
                     .padding(.horizontal, 12)
@@ -246,7 +246,7 @@ struct DepthHeatmapView: View {
 }
 
 #Preview {
-    DepthVisualizationView()
+    DepthVisualizationView(depthMap: nil)
         .environmentObject(AppState())
         .padding()
 }
