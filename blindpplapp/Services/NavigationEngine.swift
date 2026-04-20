@@ -14,8 +14,6 @@ final class NavigationEngine: ObservableObject {
 
     let cameraService: CameraService
     let depthService: DepthEstimationService
-    // Ground segmentation disabled
-    // let groundSegService: GroundSegmentationService
     let yoloeService: YOLOEService
     let geminiService: GeminiService
     // SLAM disabled
@@ -38,8 +36,6 @@ final class NavigationEngine: ObservableObject {
 
     // Latest sensor data from the continuous pipeline
     private var latestObstacleMap: ObstacleMap?
-    // Ground segmentation disabled
-    // private var latestGroundMask: GroundSegmentationService.GroundMask?
     private var latestSnapshot: Data?
 
     // Gemini call management
@@ -76,8 +72,6 @@ final class NavigationEngine: ObservableObject {
 
         self.cameraService = CameraService()
         self.depthService = DepthEstimationService()
-        // Ground segmentation disabled
-        // self.groundSegService = GroundSegmentationService()
         self.yoloeService = YOLOEService()
         self.geminiService = GeminiService()
         // SLAM disabled
@@ -95,8 +89,6 @@ final class NavigationEngine: ObservableObject {
     func updatePerformanceMode(_ mode: BNConstants.PerformanceMode) {
         yoloeService.updatePerformanceMode(mode)
         depthService.updatePerformanceMode(mode)
-        // Ground segmentation disabled
-        // groundSegService.updatePerformanceMode(mode)
         BNLog.navigation.info("Performance mode updated to: \(mode.description)")
     }
 
@@ -205,7 +197,6 @@ final class NavigationEngine: ObservableObject {
         lastObstacleDescriptionTime = nil
         appState?.session.safetyAlert = .clear
         appState?.session.currentSecondaryGoal = nil
-        appState?.debugDepthMap = nil
 
         // Stop voice command listening
         voiceCommandService.stopListening()
@@ -227,16 +218,6 @@ final class NavigationEngine: ObservableObject {
                 self?.processObstacleMap(map)
             }
             .store(in: &cancellables)
-
-        // Ground segmentation disabled
-        // Ground segmentation → ground safety
-        // groundSegService.groundMaskPublisher
-        //     .receive(on: DispatchQueue.main)
-        //     .sink { [weak self] mask in
-        //         self?.latestGroundMask = mask
-        //         self?.processGroundMask(mask)
-        //     }
-        //     .store(in: &cancellables)
 
         // YOLOE secondary goal updates → spatial audio + goal lifecycle
         yoloeService.secondaryGoalDetectionPublisher
@@ -260,22 +241,6 @@ final class NavigationEngine: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] data in
                 self?.latestSnapshot = data
-            }
-            .store(in: &cancellables)
-
-        // Camera debug frames → near-realtime preview (bypasses JPEG encode/decode)
-        cameraService.debugFramePublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] image in
-                self?.appState?.debugCameraFrame = image
-            }
-            .store(in: &cancellables)
-
-        // YOLOE all detections → debug bounding box overlay
-        yoloeService.allDetectionsPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] detections in
-                self?.appState?.debugDetections = detections
             }
             .store(in: &cancellables)
 
@@ -326,15 +291,6 @@ final class NavigationEngine: ObservableObject {
     private func processObstacleMap(_ map: ObstacleMap) {
         guard appState?.session.phase == .navigating || appState?.session.phase == .planning else { return }
         guard spatialAudioService.isRunning else { return }
-
-        // Update debug visualization
-        let closest = map.closestObstacleInWalkingDirection()
-        appState?.debugDepthMap = (
-            depthGrid: map.depthGrid,
-            gridWidth: map.gridWidth,
-            gridHeight: map.gridHeight,
-            closestObstacle: closest.map { (x: Int($0.normalizedX * Float(map.gridWidth)), y: Int($0.normalizedY * Float(map.gridHeight)), distance: ObstacleMap.approximateDistance(inverseDepth: $0.depth, scaleFactor: depthService.depthScaleFactor)) }
-        )
 
         // Feed multi-zone obstacle proximity data to the spatial audio engine.
         // This produces continuous spatial clicks so users can "hear" obstacles around them.
@@ -533,28 +489,6 @@ final class NavigationEngine: ObservableObject {
         let guidanceNormX = sectors[guidanceSectorIdx].normalizedCenterX
         return (guidanceNormX - 0.5) * 2.0
     }
-
-    // MARK: - Ground safety processing (SAFETY PRIORITY 2)
-    // Ground segmentation disabled
-
-    // private func processGroundMask(_ mask: GroundSegmentationService.GroundMask) {
-    //     guard appState?.session.phase == .navigating else { return }
-    //
-    //     let safetyRatio = mask.groundSafetyAhead()
-    //     if safetyRatio < 0.4 {
-    //         let direction = SIMD3<Float>(0, 0, -1)
-    //         appState?.session.safetyAlert = .groundUnsafe(direction: direction)
-    //         hapticService.play(.groundUnsafe)
-    //         spatialAudioService.playGroundWarning(direction: direction)
-    //         speechService.speak("Caution. Ground ahead may not be safe to walk on.", priority: .urgent)
-    //     }
-    //
-    //     if let boundaryDir = mask.groundBoundaryWarning() {
-    //         spatialAudioService.playGroundWarning(direction: boundaryDir)
-    //         let side = boundaryDir.x < 0 ? "left" : "right"
-    //         speechService.speak("Ground disappearing on your \(side). Stay centered.", priority: .normal)
-    //     }
-    // }
 
     // MARK: - Secondary goal tracking
 

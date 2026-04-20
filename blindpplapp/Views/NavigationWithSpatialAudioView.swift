@@ -276,7 +276,8 @@ struct NavigationWithSpatialAudioView: View {
     .padding(BNTheme.Spacing.md)
 
     SpatialAudioTestView(
-     testEngine: navigationEngine, hopTargetLabel: navigationEngine.hopTargetDescriptor
+     testEngine: navigationEngine, hopTargetLabel: navigationEngine.hopTargetDescriptor,
+     manageLifecycle: false
     )
     .frame(maxHeight: .infinity)
    }

@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 import SwiftUI
-import UIKit
 import os
 
 // MARK: - Global observable app state shared across views and services
@@ -10,17 +9,6 @@ import os
 final class AppState: ObservableObject {
     @Published var session = NavigationSession()
     @Published var isSettingsPresented = false
-
-    // MARK: - Debug visualization
-
-    /// Latest depth map for visualization (debug mode)
-    @Published var debugDepthMap: (depthGrid: [[Float]], gridWidth: Int, gridHeight: Int, closestObstacle: (x: Int, y: Int, distance: Float)?)?
-
-    /// Latest camera frame as UIImage for debug overlay
-    @Published var debugCameraFrame: UIImage?
-
-    /// Latest YOLOE detections for bounding box overlay
-    @Published var debugDetections: [YOLOEService.Detection] = []
 
     // MARK: - Voice command state
 

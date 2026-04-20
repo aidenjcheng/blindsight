@@ -60,7 +60,6 @@ final class YOLOEService: ObservableObject {
 
   let secondaryGoalDetectionPublisher = PassthroughSubject<TrackedInstance?, Never>()
   let finalDestinationDetectionPublisher = PassthroughSubject<TrackedInstance?, Never>()
-  let allDetectionsPublisher = PassthroughSubject<[Detection], Never>()
 
   // MARK: - State
 
@@ -366,10 +365,6 @@ final class YOLOEService: ObservableObject {
   // MARK: - Process parsed detections (goal matching)
 
   private func processDetections(_ allDetections: [Detection]) {
-    DispatchQueue.main.async {
-      self.allDetectionsPublisher.send(allDetections)
-    }
-
     let filtered = allDetections.filter {
       $0.confidence >= BNConstants.yoloeConfidenceThreshold
     }

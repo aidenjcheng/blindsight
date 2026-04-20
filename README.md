@@ -1,132 +1,92 @@
-# BlindNav - Indoor Navigation for Blind Users
+# BlindSight / BlindNav
 
-An iOS app that guides blind users through indoor environments using on-device ML models, ARKit SLAM, Gemini 3 Flash scene reasoning, and spatial audio.
+iOS accessibility app for indoor guidance: voice or typed destination, on-device **YOLOE** (open-vocabulary) tracking, **Google Gemini** (`gemini-2.5-flash`) for subgoals, **ARKit** scene depth + mesh (LiDAR where available), and **spatial audio** (including head tracking with compatible headphones).
 
-## How It Works
+The shipping UI entry point is **`BlindSightApp`**. The Xcode target and bundle live under **`blindpplapp/`**.
 
-1. **User speaks a destination** (e.g., "bathroom", "elevator", "exit")
-2. **Gemini 3 Flash** analyzes the camera feed and SLAM map to pick an intermediate landmark/object as a waypoint
-3. **YOLOE** detects and tracks that object in real-time using open-vocabulary text prompts
-4. **Spatial audio** guides the user toward the waypoint via 3D-positioned sound in AirPods
-5. **Depth estimation** (MiDaS v2.1 Small) and **ground segmentation** (MobileNetV4-Small) run continuously for obstacle avoidance
-6. **ARKit** provides 6DOF SLAM tracking — maintains phantom coordinates when objects leave the frame and detects circular movement
-7. Steps 2–6 loop: when a waypoint is reached, Gemini picks the next one until the destination is found
+## How a session works
 
-## Architecture
+1. **Home** — User grants camera + speech permissions, then speaks or types a destination (e.g. bathroom, exit).
+2. **Full-screen navigation** — `NavigationWithSpatialAudioView` presents `SpatialAudioTestView`, backed by **`SpatialAudioTestEngine`**.
+3. **ARKit** — Own `ARSession`: depth semantics, optional mesh anchors, world-locked obstacle clicks, camera path sampling.
+4. **Gemini** — JPEG snapshots from the live frame choose / refresh **secondary goals** (text prompts for YOLOE).
+5. **YOLOE (Core ML)** — `YOLOE11S.mlpackage` tracks the current prompt; guidance combines beeps, obstacle zones, and TTS.
+6. **Voice commands** — Wake word (`BNConstants.voiceCommandWakeWord`, default **“phone”**) routes follow-up questions through Gemini with the latest snapshot.
 
+## Architecture (runtime)
+
+```mermaid
+flowchart TB
+  subgraph ui [SwiftUI]
+    Home[HomeView]
+    NavSheet[NavigationWithSpatialAudioView]
+    Spatial[SpatialAudioTestView / SpatialAudioTestEngine]
+    Home --> NavSheet --> Spatial
+  end
+
+  subgraph engine [SpatialAudioTestEngine]
+    AR[ARSession depth + mesh]
+    YOLOE[YOLOEService CoreML]
+    GEM[GeminiService REST]
+    SP[SpeechService]
+    VC[VoiceCommandService]
+    AUDIO[AVAudioEngine spatial graph]
+  end
+
+  Spatial --> engine
+  AR --> YOLOE
+  AR --> AUDIO
+  YOLOE --> AUDIO
+  GEM --> SP
 ```
-Camera (30fps) ──┬──> MiDaS Depth ──────> Obstacle Avoidance ──┐
-                 ├──> Ground Segmentation -> Ground Safety ─────┤
-                 ├──> YOLOE (goal tracking) ────────────────────┼──> Navigation Engine ──> Spatial Audio + TTS + Haptics
-                 ├──> YOLOE (destination scan) ─────────────────┤
-                 └──> ARKit SLAM ───────────────────────────────┘
-                                                                        │
-                 Camera Snapshot + SLAM Summary ──> Gemini 3 Flash ─────┘
-```
+
+### `NavigationEngine` (secondary)
+
+`HomeView` still constructs **`NavigationEngine`** on first appear so **`SpeechService`** (listen / TTS before navigation), **`GeminiService`** reconfiguration from Settings, and performance sliders apply to **`YOLOEService`** / **`DepthEstimationService`**. Its **`start(destination:)`** navigation path is **not** wired from the current home flow (all active navigation is `SpatialAudioTestEngine`). Keeping it allows future unification or testing without deleting the LiDAR depth + mesh → `SpatialAudioService` pipeline.
+
+## Repository layout
+
+| Path | Role |
+|------|------|
+| `blindpplapp/` | App sources, `Info.plist`, assets, `Resources/` (entitlements, `YOLOE11S.mlpackage`) |
+| `blindpplapp.xcodeproj/` | Xcode project (file-system synchronized group for `blindpplapp/`) |
+| `ModelConversion/` | Python scripts to export / download Core ML models |
 
 ## Requirements
 
-- iPhone 11 or newer
-- iOS 16.0+
-- Xcode 16.0+ / Swift 5.10+
-- AirPods (recommended for spatial audio; falls back to device speaker)
-- Gemini API key (from [Google AI Studio](https://aistudio.google.com/))
+- **Device**: iPhone with a back camera; **LiDAR + mesh** improve obstacles and mesh features (Pro models).
+- **OS / tools**: Matches your project settings in Xcode (currently **iOS 26.x** deployment in `project.pbxproj` — adjust if you need an older floor).
+- **API**: Gemini key from [Google AI Studio](https://aistudio.google.com/) (stored locally; optional default in `BNConstants` for development only — rotate keys for anything public).
 
 ## Setup
 
-### 1. Install XcodeGen (if not installed)
+1. Open **`blindpplapp.xcodeproj`** in Xcode.
+2. Set your **team** and bundle id if needed (`PRODUCT_BUNDLE_IDENTIFIER` in build settings).
+3. Ensure **`blindpplapp/Resources/YOLOE11S.mlpackage`** is present (or re-export from `ModelConversion/export_yoloe_coreml.py`).
+4. Add your Gemini API key in **Settings** inside the app (or rely on your configured default for dev).
+5. Run on a **physical device** (ARKit + camera; simulator is not sufficient for real navigation).
 
-```bash
-brew install xcodegen
-```
-
-### 2. Prepare ML Models
+### Optional: regenerate Core ML assets
 
 ```bash
 cd ModelConversion
 pip install -r requirements.txt
-
-# Export YOLOE-11S to CoreML
 python export_yoloe_coreml.py
-
-# Export ground segmentation model to CoreML
-python export_ground_seg_coreml.py
-
-# Download and convert MiDaS v2.1 Small to CoreML
-python download_midas_coreml.py
+# Other scripts (e.g. midas / ground seg) exist for experiments; the current app uses LiDAR depth in-engine, not MiDaS in the main path.
 ```
 
-The exported `.mlpackage` files will be placed in `BlindNav/Resources/CoreMLModels/`.
+Place exported packages under `blindpplapp/Resources/` and add them to the target if you introduce new models.
 
-### 3. Generate Xcode Project
+## Permissions
 
-```bash
-cd ..  # back to BlindNav root
-xcodegen generate
-```
+Declared in `Info.plist` / build settings: **Camera**, **Microphone**, **Speech Recognition**, **Motion** (head tracking for spatial audio).
 
-### 4. Open in Xcode
+## Safety and limitations
 
-```bash
-open BlindNav.xcodeproj
-```
-
-### 5. Configure
-
-- Add your Gemini API key in the app's Settings screen
-- Set your development team in Xcode's Signing & Capabilities
-- The app requires Camera, Microphone, Speech Recognition, and Motion permissions (prompts appear on first launch)
-
-### 6. Build & Run
-
-Build and run on a physical iPhone (ARKit requires a real device).
-
-## Project Structure
-
-```
-BlindNav/
-├── BlindNav/
-│   ├── App/                    App entry point and global state
-│   ├── Models/                 Data models (navigation state, goals, maps)
-│   ├── Services/
-│   │   ├── CameraService       AVCaptureSession frame distribution
-│   │   ├── DepthEstimation     MiDaS v2.1 Small CoreML inference
-│   │   ├── GroundSegmentation  MobileNetV4-Small binary ground mask
-│   │   ├── YOLOEService        Open-vocab detection with instance locking
-│   │   ├── GeminiService       Gemini 3 Flash API for scene reasoning
-│   │   ├── SLAMService         ARKit 6DOF tracking and visited-area map
-│   │   ├── SpatialAudio        3D positional audio via AVAudioEngine
-│   │   ├── SpeechService       Speech recognition + TTS
-│   │   ├── HapticService       Core Haptics for safety feedback
-│   │   └── NavigationEngine    Core orchestrator / state machine
-│   ├── Views/                  SwiftUI views (Home, Navigation, Settings)
-│   ├── Utilities/              Logging and constants
-│   └── Resources/              Info.plist, entitlements, audio, CoreML models
-├── ModelConversion/            Python scripts for model export
-├── project.yml                 XcodeGen project specification
-└── README.md
-```
-
-## Safety Design
-
-1. **Obstacle collision prevention** — highest priority, overrides all navigation
-2. **Ground safety** — prevents walking off ledges, stairs, or non-walkable surfaces
-3. **Navigation accuracy** — third priority; safe > fast
-4. **Emergency stop** — triple-tap screen or say "Stop"
-5. **Redundant feedback** — all warnings use audio + haptics + TTS
-6. **Cautious mode** — if ML models fail, system warns and pauses guidance
-7. **Anti-circling** — SLAM detects loops and injects context into Gemini
-
-## ML Models
-
-| Model | Purpose | Size | Speed |
-|-------|---------|------|-------|
-| MiDaS v2.1 Small | Monocular depth estimation | ~20 MB | ~15ms/frame |
-| MobileNetV4-Small + ASPP | Binary ground segmentation | ~15 MB | ~10ms/frame |
-| YOLOE-11S | Open-vocabulary object detection | ~30 MB | ~20ms/frame |
-
-All models run on the Neural Engine via CoreML for maximum efficiency.
+- Obstacle feedback is **assistive**, not a substitute for a cane, dog, or human guide.
+- Network calls to Gemini require connectivity; YOLOE and ARKit run on-device.
+- Two engines (`NavigationEngine` vs `SpatialAudioTestEngine`) share concepts but only the latter drives the current user-facing navigation UI.
 
 ## License
 
-This project is for research and accessibility purposes.
+Research and accessibility use unless you add your own terms.

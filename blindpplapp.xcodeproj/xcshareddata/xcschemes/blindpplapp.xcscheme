@@ -50,13 +50,6 @@
             ReferencedContainer = "container:blindpplapp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <EnvironmentVariables>
-         <EnvironmentVariable
-            key = "API_KEY"
-            value = "AIzaSyADEk2IP6oasXzTg2DiCs9rQXO3-PghwCo"
-            isEnabled = "YES">
-         </EnvironmentVariable>
-      </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"

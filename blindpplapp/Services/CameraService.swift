@@ -23,9 +23,6 @@ final class CameraService: NSObject, ObservableObject {
     /// Latest JPEG data for Gemini API (compressed snapshot)
     let snapshotPublisher = PassthroughSubject<Data, Never>()
 
-    /// High-frequency UIImage for debug camera preview (bypasses JPEG encode/decode)
-    let debugFramePublisher = PassthroughSubject<UIImage, Never>()
-
     @Published private(set) var isRunning = false
     @Published private(set) var hasFirstSnapshot = false
 
@@ -53,11 +50,6 @@ final class CameraService: NSObject, ObservableObject {
     private var lastSnapshotTime: Date = .distantPast
     private let snapshotInterval: TimeInterval = 0.5
     private var firstSnapshotCaptured = false
-
-    // Throttle debug frames separately (much faster than Gemini snapshots)
-    // Only accessed from processingQueue (inside captureOutput delegate).
-    private var lastDebugFrameTime: Date = .distantPast
-    private let debugFrameInterval: TimeInterval = 0.066  // ~15fps for debug view
 
     // MARK: - Lifecycle
 
@@ -180,21 +172,6 @@ final class CameraService: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Debug frame (fast path, no JPEG)
-
-    /// Publishes a UIImage directly from the pixel buffer for debug visualization.
-    /// Skips JPEG encode/decode entirely for near-realtime preview.
-    private func captureDebugFrame(from pixelBuffer: CVPixelBuffer) {
-        let now = Date()
-        guard now.timeIntervalSince(lastDebugFrameTime) >= debugFrameInterval else { return }
-        lastDebugFrameTime = now
-
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-        guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
-        let uiImage = UIImage(cgImage: cgImage, scale: 1.0, orientation: imageOrientation)
-        debugFramePublisher.send(uiImage)
-    }
-
     // MARK: - External frame ingestion (from ARSession)
 
     /// Processes a pixel buffer provided externally (e.g., from ARSession's capturedImage).
@@ -202,8 +179,6 @@ final class CameraService: NSObject, ObservableObject {
     func processExternalFrame(_ pixelBuffer: CVPixelBuffer) {
         processingQueue.async { [weak self] in
             guard let self else { return }
-
-            self.captureDebugFrame(from: pixelBuffer)
 
             guard !self.isFramePublishingPaused else {
                 self.captureSnapshot(from: pixelBuffer)
@@ -257,10 +232,6 @@ extension CameraService: AVCaptureVideoDataOutputSampleBufferDelegate {
             BNLog.camera.error("Failed to copy pixel buffer")
             return
         }
-
-        // Always capture debug frames for near-realtime preview (lightweight, no JPEG)
-        // Must use copiedBuffer — original pixelBuffer is recycled by AVFoundation after callback
-        captureDebugFrame(from: copiedBuffer)
 
         // Only publish frames if not paused (reduces ML pipeline load when waiting for Gemini)
         guard !isFramePublishingPaused else {

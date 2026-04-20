@@ -39,7 +39,7 @@ struct SpatialAudioMeshViewerHeader: View {
    } label: {
     HStack(spacing: 6) {
      Image(systemName: "arrow.left")
-     Text("Scan Again")
+     Text("Back to Scan")
     }
     .font(BNTheme.Font.bodyMedium)
     .foregroundColor(BNTheme.brandPrimary)
@@ -311,7 +311,7 @@ struct SpatialAudioControls: View {
     } label: {
      HStack(spacing: 8) {
       Image(systemName: "cube.fill")
-      Text("End Scan")
+      Text("View Scan")
      }
      .font(BNTheme.Font.bodyMedium)
      .foregroundColor(.white)

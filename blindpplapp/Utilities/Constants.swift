@@ -60,15 +60,6 @@ enum BNConstants {
   static let cameraFrameHeight: Int = 720
   static let cameraFPS: Int = 15  // Further reduced to minimize ML pipeline load
 
-  // MARK: - Depth model
-
-  /// MiDaS v2.1 Small input resolution
-  static let depthModelInputSize: Int = 256
-
-  // MARK: - Ground segmentation model
-
-  static let groundSegInputSize: Int = 256
-
   // MARK: - Spatial audio
 
   /// How far away (in virtual meters) to place the goal audio source
@@ -87,11 +78,11 @@ enum BNConstants {
   ///
   /// AIzaSyDvGLiequiEp9mzGmvOvJOWxw7JjIBFTvw
   //  static let hardcodedGeminiAPIKey = "AIzaSyBGiJwodrYdIYcn_V9W9AsoqLPtx-ETXlk"
-  static let hardcodedGeminiAPIKey = ProcessInfo.processInfo.environment["API_URL"] ?? ""
+  static let hardcodedGeminiAPIKey = "AIzaSyDvGLiequiEp9mzGmvOvJOWxw7JjIBFTvw"
 
   // MARK: - User defaults keys
 
-  static let apiKeyUserDefaultsKey = ProcessInfo.processInfo.environment["API_URL"] ?? "gemini_api_key"
+  static let apiKeyUserDefaultsKey = "AIzaSyDvGLiequiEp9mzGmvOvJOWxw7JjIBFTvw"
   static let dangerDistanceKey = "danger_distance"
   static let warningDistanceKey = "warning_distance"
   static let voiceSpeedKey = "voice_speed"
